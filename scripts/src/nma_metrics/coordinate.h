@@ -4,6 +4,7 @@
 # include <cmath>
 # include <iomanip>
 # include <iostream>
+# include <stdexcept>
 using namespace std;
 
 struct Coordinate{
@@ -15,6 +16,28 @@ struct Coordinate{
                                       y(_y),
                                       z(_z)
     {}
+    
+    size_t size()const {
+      return 3;
+    }
+
+    float operator [] (const int i)const {
+       switch( i ){
+         case 0: return this->x;
+         case 1: return this->y;
+         case 2: return this->z;
+       } 
+       throw out_of_range("Error: Valid indices are (0,1,2)");
+    }
+    
+    float& operator [] (const int i) {
+       switch( i ){
+         case 0: return this->x;
+         case 1: return this->y;
+         case 2: return this->z;
+       } 
+       throw out_of_range("Error: Valid indices are (0,1,2)");
+    }
 };
 
 float euclidean_distance( Coordinate const& crd1, Coordinate const& crd2 ){

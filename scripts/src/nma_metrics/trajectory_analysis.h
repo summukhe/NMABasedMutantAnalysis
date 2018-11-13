@@ -6,12 +6,15 @@
 # include <cassert>
 # include <algorithm>
 # include "grid.h"
+# include "octree.h"
 # include "coordinate.h" 
 # include "trajectory.h"
 # include "residue_volume.h"
 using namespace std;
 
 typedef vector<GridSignature> TrajectorySignature;
+
+enum Approximation {  _grid = 1, _octree = 2};
 
 
 Grid3D sphere_approximation( Coordinate const& center,
@@ -34,15 +37,48 @@ Grid3D sphere_approximation( Coordinate const& center,
 }
 
 
+
 void fill_sphere_in_grid( Grid3D& grid, 
                           Coordinate const& center, 
                           const float radius, 
-                          const float precision)
+                          const float precision,
+                          const Approximation approx_type = _octree)
 {
-    Grid3D sphere = sphere_approximation( center, radius, precision );
-    for(int j=0; j < sphere.cell_count(); ++j ){
+    if( approx_type == _grid )
+    {
+      Grid3D sphere = sphere_approximation( center, radius, precision );
+      for(int j=0; j < sphere.cell_count(); ++j ){
          Coordinate crd = sphere.get_coordinate(j);
          grid.fill_volume(crd, sphere.cell_volume(j) );
+      }
+    }else{
+       SphereIntersectionDecision decision(center, radius);
+       
+       Octree octree( Coordinate(center.x + radius, 
+                                 center.y + radius, 
+                                 center.z + radius),
+                      Coordinate(center.x - radius, 
+                                 center.y - radius, 
+                                 center.z - radius),
+                      decision);
+       
+       GridIndex gidx_start = grid.grid_coordinate( Coordinate(center.x - radius, 
+                                                               center.y - radius, 
+                                                               center.z - radius ) );
+       
+       GridIndex gidx_end = grid.grid_coordinate( Coordinate(center.x + radius, 
+                                                             center.y + radius, 
+                                                             center.z + radius ) );
+       
+       
+       for( int i=gidx_start.xi; i <= gidx_end.xi; ++i)
+          for( int j=gidx_start.yi; j <= gidx_end.yi; ++j )
+             for( int k=gidx_start.zi; k <= gidx_end.zi; ++k )
+             {
+                AABB cell = grid.grid_cell_by_index( GridIndex(i,j,k) );
+                float v = octree.intersecting_volume( cell );
+                grid.fill_volume(cell.center(), v);
+             }
     }
 }
 
@@ -51,7 +87,8 @@ Grid3D fill_grid( Snapshot const& snapshot,   /* Snapshot containing all calpha 
                   Coordinate const& box_min,  /* 3D coordinate of lower corner of the bounding box */
                   Coordinate const& box_max,  /* 3D coordinate of the upper corner of the bounding box */
                   const float granularity,    /* size of each grid */
-                  const float precision       /* finer volume calculation smaller grid size */
+                  const float precision,      /* finer volume calculation smaller grid size */
+                  const Approximation approx_type = _octree
                 )
 {
    assert( precision < granularity );
@@ -59,8 +96,16 @@ Grid3D fill_grid( Snapshot const& snapshot,   /* Snapshot containing all calpha 
    int n = snapshot_size(snapshot);
    Grid3D grid( box_max.x, box_max.y, box_max.z, box_min.x, box_min.y, box_min.z, granularity, granularity, granularity );
 
-   fill_sphere_in_grid( grid, fetch_coordinate(snapshot, snapshot.residueIds[0]),   CARadius, precision );
-   fill_sphere_in_grid( grid, fetch_coordinate(snapshot, snapshot.residueIds[n-1]), CARadius, precision );
+   fill_sphere_in_grid( grid, 
+                        fetch_coordinate(snapshot, snapshot.residueIds[0]), 
+                        CARadius,
+                        precision, 
+                        approx_type );
+   fill_sphere_in_grid( grid, 
+                        fetch_coordinate(snapshot, snapshot.residueIds[n-1]), 
+                        CARadius, 
+                        precision, 
+                        approx_type );
 
    for( int i=1; i < n-1; ++i ){
       int residue0 = snapshot.residueIds[i-1];
@@ -71,10 +116,18 @@ Grid3D fill_grid( Snapshot const& snapshot,   /* Snapshot containing all calpha 
       Coordinate crd1 = fetch_coordinate(snapshot, residue1);
       Coordinate crd2 = fetch_coordinate(snapshot, residue2);
 
-      SideChainModel sm = fix_sidechain(crd0, crd1, crd2, snapshot.residueType[i] );
+      SideChainModel sm = fix_sidechain(crd0, crd1, crd2, snapshot.residueType[i]);
 
-      fill_sphere_in_grid(grid, crd1, CARadius, precision);
-      fill_sphere_in_grid(grid, sm.center, sm.R, precision);
+      fill_sphere_in_grid(grid, 
+                          crd1, 
+                          CARadius, 
+                          precision, 
+                          approx_type);
+      fill_sphere_in_grid(grid, 
+                          sm.center(), 
+                          sm.radius(), 
+                          precision, 
+                          approx_type );
    }
    return grid;   
 }
@@ -116,7 +169,8 @@ bool is_box( Coordinate const& mx_pt, Coordinate const& mn_pt ) {
 }
 
 
-float box_volume( Coordinate const& max_point, Coordinate const& min_point ) 
+float box_volume( Coordinate const& max_point, 
+                  Coordinate const& min_point ) 
 {
    assert( is_box(max_point, min_point) );
    return (max_point.x - min_point.x)*(max_point.y - min_point.y)*(max_point.z - min_point.z);
@@ -134,8 +188,10 @@ bool is_inside( Coordinate const& mx_point,
 }
 
 
-int box_intersect( Coordinate const& max_point1, Coordinate const& min_point1,
-                   Coordinate const& max_point2, Coordinate const& min_point2 )
+int box_intersect( Coordinate const& max_point1, 
+                   Coordinate const& min_point1,
+                   Coordinate const& max_point2, 
+                   Coordinate const& min_point2 )
 {
    Coordinate max_point_ref = max_point1, 
               min_point_ref = min_point1,
@@ -164,23 +220,30 @@ int box_intersect( Coordinate const& max_point1, Coordinate const& min_point1,
 }
 
 
-bool is_intersecting( Coordinate const& max_point1, Coordinate const& min_point1, 
-                      Coordinate const& max_point2, Coordinate const& min_point2 )
+bool is_intersecting( Coordinate const& max_point1, 
+                      Coordinate const& min_point1, 
+                      Coordinate const& max_point2, 
+                      Coordinate const& min_point2 )
 {
   return (box_intersect(max_point1, min_point1, max_point2, min_point2) > 0);
 }
 
 
-bool inclusive( Coordinate const& max_point1, Coordinate const& min_point1,
-                Coordinate const& max_point2, Coordinate const& min_point2)
+bool inclusive( Coordinate const& max_point1, 
+                Coordinate const& min_point1,
+                Coordinate const& max_point2, 
+                Coordinate const& min_point2)
 {
    return (box_intersect(max_point1, min_point1, max_point2, min_point2) == 8);
 }
 
 
-bool union_box( Coordinate const& max_point1, Coordinate const& min_point1,
-                Coordinate const& max_point2, Coordinate const& min_point2,
-                Coordinate& max_point,  Coordinate& min_point )
+bool union_box( Coordinate const& max_point1, 
+                Coordinate const& min_point1,
+                Coordinate const& max_point2, 
+                Coordinate const& min_point2,
+                Coordinate& max_point,  
+                Coordinate& min_point )
 {
   assert( is_box(max_point1, min_point1) && is_box(max_point2, min_point2) );
   bool status = ( ! is_intersecting( max_point1, min_point1, max_point2, min_point2) );
@@ -245,7 +308,7 @@ vector<float> trajectory_signature_different( TrajectorySignature const& trj_sig
   vector<float> v;
   int n = trj_sig1.size();
   for( int i=0; i < n; ++i )
-     v.push_back( grid_signature_difference(trj_sig1[i], trj_sig1[ (i + theta) % n ]) );
+     v.push_back( grid_signature_difference(trj_sig1[i], trj_sig2[ (i + theta) % n ]) );
   return v;
 }
 

@@ -38,15 +38,18 @@ int snapshot_size(Snapshot const& snapshot){
    return static_cast<int>(snapshot.residueType.size());
 }
 
+
 int trajectory_size(Trajectory const& trj ){
   return static_cast<int>(trj.size());
 }
+
 
 void clear_snapshot(Snapshot& snapshot ){
   snapshot.residueType.clear();
   snapshot.residueIds.clear();
   snapshot.coordinates.clear();
 }
+
 
 bool valid_snapshot( Snapshot& snapshot ){
    if( ( snapshot.residueType.size() == snapshot.residueIds.size() ) &&
@@ -55,6 +58,7 @@ bool valid_snapshot( Snapshot& snapshot ){
    return false;
 }
 
+
 int residue_position( Snapshot const& snapshot, const int residueId ){
    typename vector<int>::const_iterator it;
    if( (it = find( snapshot.residueIds.begin(), snapshot.residueIds.end(), residueId)) == snapshot.residueIds.end() )
@@ -62,10 +66,12 @@ int residue_position( Snapshot const& snapshot, const int residueId ){
    return static_cast<int>( it - snapshot.residueIds.begin() );
 }
 
+
 Coordinate fetch_coordinate(Snapshot const& snapshot, const int residueId){
    int i = residue_position(snapshot, residueId );
    return ( i == -1 )?Coordinate():snapshot.coordinates[i];
 }
+
 
 string fetch_resname(Snapshot const& snapshot, const int residueId){
     int i = residue_position(snapshot, residueId);
@@ -108,6 +114,7 @@ Snapshot snapshot_truncate( Snapshot const& snap, const int start_resid, const i
    return part;
 }
 
+
 float snapshot_distance( Snapshot const& snap1,
                          Snapshot const& snap2,
                          const bool allow_mutation )
@@ -123,6 +130,7 @@ float snapshot_distance( Snapshot const& snap1,
   }  
   return sqrt(s / n);
 }
+
 
 float trajectory_distance( Trajectory const& trj1, 
                            Trajectory const& trj2, 

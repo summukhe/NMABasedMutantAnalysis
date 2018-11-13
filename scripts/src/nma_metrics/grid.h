@@ -7,6 +7,8 @@
 # include <cassert>
 # include <iomanip>
 # include <iostream>
+# include "geometry.h"
+# include "coordinate.h"
 using namespace std;
 
 # ifndef EPS
@@ -103,6 +105,23 @@ class Grid3D{
        return this->grid_coordinate( Coordinate(x,y,z) ); 
      }
 
+     inline AABB grid_cell( Coordinate const& crd ) const {
+        return  this->grid_cell_by_index( this->grid_coordinate(crd) );
+     }
+     
+     inline AABB grid_cell_by_index( GridIndex const& gidx ) const {
+        return AABB( Coordinate( (gidx.xi+1) * this->dx + this->x_min, 
+                                 (gidx.yi+1) * this->dy + this->y_min, 
+                                 (gidx.zi+1) * this->dz + this->z_min ),
+                     Coordinate( gidx.xi * this->dx + this->x_min, 
+                                 gidx.yi * this->dy + this->y_min, 
+                                 gidx.zi * this->dz + this->z_min ) );
+     }
+     
+     inline AABB grid_cell_by_index( const int i ) const {
+          return this->grid_cell_by_index( this->to_grid_index(i) );
+     }
+
      inline int to_linear_index( GridIndex const& gidx )const {
         int index = INVALID_INDEX;
         if( valid_grid_index(gidx) )
@@ -143,6 +162,14 @@ class Grid3D{
          if (this->grid_cells[idx] > 1.0)
             this->grid_cells[idx] = 1.0;
          return true;
+     }
+
+     inline bool free_volume( Coordinate const& crd, const float vol ){
+        if( ! this->inside_grid(crd) || vol < 0.f ) return false;
+        int idx = this->to_linear_index( this->grid_coordinate(crd) );
+        float frac = vol / (1.f * this->cell_volume() );
+        this->grid_cells[idx] = (frac > this->grid_cells[idx])?0.f:this->grid_cells[idx] - frac;
+        return true;
      }
 
      inline float filled_volume()const{
