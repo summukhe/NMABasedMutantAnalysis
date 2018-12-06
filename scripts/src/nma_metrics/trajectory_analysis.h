@@ -16,6 +16,66 @@ typedef vector<GridSignature> TrajectorySignature;
 
 enum Approximation {  _grid = 1, _octree = 2};
 
+Grid3D sphere_approximation( Coordinate const&,
+                             const float,
+                             const float);
+
+void fill_sphere_in_grid( Grid3D& , 
+                          Coordinate const& , 
+                          const float , 
+                          const float ,
+                          const Approximation = _grid);
+
+Grid3D fill_grid( Snapshot const& ,
+                  Coordinate const& ,
+                  Coordinate const& ,
+                  const float ,
+                  const float ,
+                  const Approximation = _grid);
+
+bool get_bounding_box( Trajectory const&, 
+                       vector<int> const&, 
+                       Coordinate&, 
+                       Coordinate&);
+
+
+bool is_box( Coordinate const& , 
+             Coordinate const&  );
+             
+  
+float box_volume( Coordinate const& , 
+                  Coordinate const& );  
+
+
+bool is_inside( Coordinate const& , 
+                Coordinate const& , 
+                Coordinate const& );
+         
+int box_intersect( Coordinate const& , 
+                   Coordinate const& ,
+                   Coordinate const& , 
+                   Coordinate const& );
+                   
+bool inclusive( Coordinate const& , 
+                Coordinate const& ,
+                Coordinate const& , 
+                Coordinate const& );
+                
+bool union_box( Coordinate const& , 
+                Coordinate const& ,
+                Coordinate const& , 
+                Coordinate const& ,
+                Coordinate& ,  
+                Coordinate& );
+                   
+TrajectorySignature generate_volume_signature( Trajectory const& , 
+                                                 Coordinate const& ,
+                                                 Coordinate const& , 
+                                                 const float , 
+                                                 const float );                   
+                   
+GridSignature occlusion_map( TrajectorySignature const&);    
+               
 
 Grid3D sphere_approximation( Coordinate const& center,
                              const float radius,
@@ -42,7 +102,7 @@ void fill_sphere_in_grid( Grid3D& grid,
                           Coordinate const& center, 
                           const float radius, 
                           const float precision,
-                          const Approximation approx_type = _octree)
+                          const Approximation approx_type)
 {
     if( approx_type == _grid )
     {
@@ -88,8 +148,7 @@ Grid3D fill_grid( Snapshot const& snapshot,   /* Snapshot containing all calpha 
                   Coordinate const& box_max,  /* 3D coordinate of the upper corner of the bounding box */
                   const float granularity,    /* size of each grid */
                   const float precision,      /* finer volume calculation smaller grid size */
-                  const Approximation approx_type = _octree
-                )
+                  const Approximation approx_type )
 {
    assert( precision < granularity );
    assert( precision > 0. );

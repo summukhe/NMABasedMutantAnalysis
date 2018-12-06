@@ -19,19 +19,46 @@ typedef vector<Snapshot> Trajectory;
 typedef vector<int>  ResidueIds;
 
 void       clear_snapshot( Snapshot&);
+
 bool       valid_snapshot( Snapshot const& );
+
 int        snapshot_size( Snapshot const& );
+
 int        trajectory_size(Trajectory const& );
 
-int        residue_position( Snapshot const&, const int );
-Coordinate fetch_coordinate( Snapshot const&, const int );
-string     fetch_resname(Snapshot const&, const int);
+int        residue_position( Snapshot const&, 
+                             const int );
 
-bool       snapshot_check( Snapshot const&, Snapshot const&, const bool = false );
-Snapshot   snapshot_truncate( Snapshot const&, const int, const int);
-float      snapshot_distance( Snapshot const&, Snapshot const&, const bool = false );
-float      trajectory_distance( Trajectory const&, Trajectory const&, const bool = false, const int  = 0, const bool  = false );
-int        trajectory_align( Trajectory const&, Trajectory const&, const bool = false , const bool = false);
+Coordinate fetch_coordinate(Snapshot const&, 
+                            const int );
+
+string     fetch_resname(Snapshot const&, 
+                         const int);
+
+bool       snapshot_check( Snapshot const&, 
+                           Snapshot const&, 
+                           const bool = false );
+
+Snapshot   snapshot_truncate( Snapshot const&, 
+                              const int, 
+                              const int);
+
+float      snapshot_distance( Snapshot const&, 
+                              Snapshot const&, 
+                              const bool = false );
+
+float      trajectory_distance( Trajectory const&, 
+                                Trajectory const&, 
+                                const bool = false, 
+                                const int  = 0, 
+                                const bool  = false );
+                                
+int        trajectory_align( Trajectory const&, 
+                             Trajectory const&, 
+                             const bool = false , 
+                             const bool = false);
+
+Trajectory flip_trajectory( Trajectory const& );
 
 
 int snapshot_size(Snapshot const& snapshot){
@@ -158,7 +185,10 @@ float trajectory_distance( Trajectory const& trj1,
   return sqrt( s / n);
 }
 
-int trajectory_align( Trajectory const& trj1, Trajectory const& trj2, const bool allow_mutation, const bool flip)
+int trajectory_align( Trajectory const& trj1, 
+                      Trajectory const& trj2, 
+                      const bool allow_mutation, 
+                      const bool flip)
 {
    assert( trajectory_size(trj1) == trajectory_size(trj2) );
    int n = trajectory_size(trj1);
@@ -172,6 +202,15 @@ int trajectory_align( Trajectory const& trj1, Trajectory const& trj2, const bool
      }
    }
    return shift;
+}
+
+Trajectory flip_trajectory( Trajectory const& trj )
+{
+    int n = trajectory_size(trj);
+    Trajectory rev;
+    for(int i=0; i < n; ++i )
+        rev.push_back( trj[(n-i-1)%n ] );
+    return rev;
 }
 
 # endif

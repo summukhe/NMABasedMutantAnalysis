@@ -3,8 +3,12 @@
 
 # include <cmath>
 # include <vector>
+# include <cstring>
 # include <cassert>
+# include <cstdlib>
 # include <stdexcept>
+# include <iomanip>
+# include <iostream>
 # include "coordinate.h"
 using namespace std;
 
@@ -15,6 +19,10 @@ using namespace std;
 # define MINIMUM(x,y) (((x) < (y))?(x):(y))
 # define MAXIMUM(x,y) (((x) > (y))?(x):(y))
 # define SQ(x)        ((x)*(x))
+# define RAD2DEG(x)   ((x) * (180.f/M_PI))
+# define DEG2RAD(x)   ((x) * (M_PI/180.f))
+
+enum AngleFormat { __radian = 1, __degree = 2 };
 
 class Sphere3D{
    private:
@@ -109,10 +117,86 @@ class Vector3D{
 
 };
 
+ostream& operator << (ostream& os, Vector3D const& v ){
+   os << fixed << setprecision(3) 
+	  << setw(8) << v[0] << "i  + " 
+	  << setw(8) << v[1] << "j  + "
+	  << setw(8) << v[2] << "k"; 
+   return os;
+}
+
+
+class Matrix3D{
+private:
+	float _data[3][3];
+public:
+	Matrix3D(float c=0.f){
+		for(int i=0; i < 3; ++i )
+			for(int j=0; j < 3; ++j )
+				this->_data[i][j] = c;
+	}
+	
+	Matrix3D(Matrix3D const& rhs){
+		memcpy(this->_data, rhs._data, sizeof(this->_data));
+	}
+	
+	float operator () (const int i, const int j) const{
+		return this->_data[i][j];
+	}
+	
+	float& operator () (const int i, const int j){
+	  return this->_data[i][j];
+	}
+	
+	Matrix3D transpose()const{
+		Matrix3D trp;
+		for(int i=0; i < 3; ++i)
+			for(int j=0; j < 3; ++j)
+				trp._data[i][j] = this->_data[j][i];
+		return trp;
+	}
+	
+	int nrows()const { return 3; }
+	int ncols()const { return 3; }
+	
+	Vector3D row(const int n)const {
+		Vector3D r;
+		for( int i=0; i < 3; ++i )
+			r[i] = this->_data[n][i];
+		return r;
+	}
+	
+	Vector3D col(const int n)const {
+		Vector3D c;
+		for( int i=0; i < 3; ++i )
+			c[i] = this->_data[i][n];
+		return c;
+	}
+	
+	~Matrix3D()
+	{}
+};
+
+ostream& operator << (ostream& os, Matrix3D const& m){
+	os << fixed << setprecision(3) 
+	   << setw(8) << m(0,0) << setw(8) << m(0,1) << setw(8) << m(0,2) << endl
+	   << setw(8) << m(1,0) << setw(8) << m(1,1) << setw(8) << m(1,2) << endl
+	   << setw(8) << m(2,0) << setw(8) << m(2,1) << setw(8) << m(2,2) ;
+	return os;
+}
+
+
+float det(Matrix3D const& m){
+	return m(0,0) * (m(1,1)*m(2,2) - m(2,1)*m(1,2)) + 
+		   m(0,1) * (m(1,2)*m(2,0) - m(1,0)*m(2,2)) +
+		   m(0,2) * (m(1,0)*m(2,1) - m(1,1)*m(2,0));
+}  
+
+
 float dot( Vector3D const& v1, Vector3D const& v2){
   float s = 0;
   for( int i=0; i < (int)v1.size(); ++i)
-    s = v1[i] * v2[i];
+    s += v1[i] * v2[i];
   return s;
 }
 
@@ -128,6 +212,49 @@ Vector3D operator * (Vector3D const& v, const float x){
    return Vector3D(x*v[0], x*v[1], x*v[2]);
 }
 
+Vector3D operator * (Matrix3D const& m, Vector3D const& v){
+	Vector3D r;
+	r[0] = v[0]*m(0,0) + v[1]*m(0,1) + v[2]*m(0,2);
+	r[1] = v[0]*m(1,0) + v[1]*m(1,1) + v[2]*m(1,2);
+	r[2] = v[0]*m(2,0) + v[1]*m(2,1) + v[2]*m(2,2);
+	return r;
+}
+
+Matrix3D operator * (Matrix3D const& m1, Matrix3D const& m2){
+	Matrix3D m;
+	for( int i=0; i < 3; i++ ){
+		for( int j=0; j < 3; j++ ){
+			float t = 0.f;
+			for( int k=0; k < 3; k++ )
+				t += m1(i,k)*m2(k,j);
+			m(i,j) = t;
+		}
+	}
+	return m;
+}
+
+Matrix3D rotation_matrix( Vector3D const& v, const float theta){
+	Vector3D u = v.unit_vector();
+	Matrix3D m;
+	float ct = cos(theta), st = sin(theta);
+	m(0,0) = ct + SQ(u[0]) * (1. - ct); 
+	m(0,1) = u[0]*u[1]*(1. - ct) - u[2]*st; 
+	m(0,2) = u[0]*u[2]*(1. - ct) + u[1]*st;
+	
+	m(1,0) = u[0]*u[1]*(1. - ct) + u[2]*st; 
+	m(1,1) = ct + SQ(u[1])*(1. - ct); 
+	m(1,2) = u[1]*u[2]*(1. - ct) - u[0]*st;
+	
+	m(2,0) = u[2]*u[0]*(1. - ct) - u[1]*st; 
+	m(2,1) = u[2]*u[1]*(1. - ct) + u[0]*st; 
+	m(2,2) = ct + SQ(u[2])*(1. - ct);
+	return m;
+}
+
+
+Vector3D connecting_vector( Coordinate const& src, Coordinate const& dst ){
+    return Vector3D( dst[0]-src[0], dst[1]-src[1], dst[2]-src[2]);
+}
 
 
 class Plane3D{
@@ -308,6 +435,7 @@ float intersecting_volume( AABB const& box1, AABB const& box2 ){
   return ibox.volume();
 }
 
+
 float intersecting_volume( Sphere3D const& sph1, Sphere3D const& sph2 ){
   if( ! is_intersecting(sph1, sph2))  return 0.f;
   float d = euclidean_distance(sph1.center(), sph2.center());
@@ -316,11 +444,44 @@ float intersecting_volume( Sphere3D const& sph1, Sphere3D const& sph2 ){
   return M_PI * SQ( R + r - d ) * (d*d + 2*d*r - 3*r*r + 2*d*R + 6 * r * R - 3*R*R)/(12.f * d);
 }
 
+
 AABB bounding_box( Sphere3D const& sphere ){
   Coordinate center = sphere.center();
   float r = sphere.radius();
   return AABB( center.x + r, center.y + r, center.z + r, center.x - r, center.y - r, center.z - r);
 }
 
+
+float calculate_angle( Coordinate const& c1, 
+                       Coordinate const& c2, 
+                       Coordinate const& c3,
+                       const AngleFormat retType = __degree)
+{
+    Vector3D v1 = connecting_vector(c1, c2).unit_vector();
+    Vector3D v2 = connecting_vector(c2, c3).unit_vector();
+    float f = dot(v1, v2);
+    assert( f <= 1.f && f >= -1.f );
+    return (retType == __degree)? RAD2DEG(acos(f)): acos(f);
+}   
+
+float dihedral_angle( Coordinate const& c1, 
+                      Coordinate const& c2,
+                      Coordinate const& c3,
+                      Coordinate const& c4,
+                      const AngleFormat retType = __degree)
+{
+    Vector3D b1 = connecting_vector(c2, c1);
+    Vector3D b2 = connecting_vector(c2, c3);
+    Vector3D b3 = connecting_vector(c3, c4);
+	
+	b2 = b2.unit_vector();
+	Vector3D v = b1 - dot(b1,b2)*b2;
+	Vector3D w = b3 - dot(b3,b2)*b2;
+	
+	float x = dot(v, w);
+    float y = dot(cross(b2,v), w);
+	
+	return  (retType == __degree)? RAD2DEG(atan2(y,x)):atan2(y,x);
+}
 
 # endif

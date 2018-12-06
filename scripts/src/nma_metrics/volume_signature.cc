@@ -15,6 +15,14 @@ int  main( int argc, char** argv){
       exit(1);
    }
    ModeCompareConfig config = read_modecompare_configfile( argv[1]);
+   Trajectory rev = flip_trajectory(config.trajectory_tgt);
+   
+   if(trajectory_distance(config.trajectory_ref, 
+                          rev ) > 
+      trajectory_distance(config.trajectory_ref, 
+                          config.trajectory_tgt))
+        config.trajectory_tgt = rev;
+   
    vector<float> vsig = trajectory_signature_different(
                                    generate_volume_signature(config.trajectory_ref , 
                                                              config.max_point, 
