@@ -1,3 +1,4 @@
+# include <map>
 # include <vector>
 # include <string>
 # include <cassert>
@@ -6,6 +7,7 @@
 # include "utility.h"
 # include "trajectory.h"
 # include "config_reader.h"
+# include "sasa_calculation.h"
 # include "trajectory_analysis.h"
 using namespace std;
 
@@ -21,13 +23,14 @@ using namespace std;
 # define MIN_GRID      1.0f
 # endif
 
+
 void usage(char const* prog)
 {
 	fprintf(stderr, "Usage: %s -s <source trajectory> -t <target trajectory> -b <box configuration> [-g <grid size>] [-h] \n", prog );
 	exit(1);
 }
 
-int  main( int argc, char** argv)
+int main(int argc, char** argv)
 {
    int c;
    string prog(argv[0]);
@@ -75,22 +78,7 @@ int  main( int argc, char** argv)
    
    BoundingBoxConfig config = ::read_boundingbox_configfile(box_configfile.c_str());
    Grid3D grid(config.box_max, config.box_min, grid_size);
-   
-   TrajectorySignature ref_trj_sig = generate_volume_signature(trajectory_ref , 
-                                                               config.box_max, 
-                                                               config.box_min, 
-                                                               grid_size, 
-                                                               VOL_DISCRETE);
-															   
-   
-   TrajectorySignature tgt_trj_sig = generate_volume_signature(trajectory_tgt , 
-                                                               config.box_max, 
-                                                               config.box_min, 
-                                                               grid_size, 
-                                                               VOL_DISCRETE );
-   
-   std::vector<float> vsig = trajectory_signature_difference(ref_trj_sig, tgt_trj_sig);
-   cout << fixed << setprecision(5) << (mean(vsig.begin(), vsig.end()) / grid.grid_volume()) * 1000.f <<endl;
-
+   std::vector<float>  vsig = ::sasa_score(trajectory_ref,trajectory_tgt,grid);
+   cout << fixed << setprecision(5) << (::mean(vsig.begin(), vsig.end()) / grid.grid_volume()) * 1000.f <<endl;
    return 0;
 }

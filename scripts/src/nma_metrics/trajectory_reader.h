@@ -12,7 +12,7 @@
 # include <fstream>
 # include "utility.h"
 # include "trajectory.h"
-# include "coordinate.h"
+# include "geometry.h"
 using namespace std;
 
 # define PDB_LINEWIDTH 100
@@ -38,12 +38,14 @@ Trajectory read_trajectory( const string& trjfile ){
    bool   append = false;
 
    while( f.getline(line, PDB_LINEWIDTH) ){
-     if( strncmp(line, "MODEL", 5) == 0 ){
+     if( strncmp(line, "MODEL", 5) == 0 )
+	 {
          if( to_append(trajectory, snapshot) ) 
            trajectory.push_back(snapshot);
          clear_snapshot(snapshot);
      }
-     if( (strncmp(line, "ATOM  ",6 ) == 0) && (string(line).substr(13,2) == "CA" ) ){
+     if( (strncmp(line, "ATOM  ",6 ) == 0) && (string(line).substr(13,2) == "CA" ) )
+	 {
         residueType = string(line).substr(17,3);
         resid = atoi(string(line).substr(22,4).c_str());
         x = atof(string(line).substr(30,8).c_str());
@@ -55,7 +57,8 @@ Trajectory read_trajectory( const string& trjfile ){
      }
      bzero( (void*)line, PDB_LINEWIDTH + 1);
    }
-   if( snapshot_size(snapshot) > 0 && to_append(trajectory, snapshot) ){
+   if( snapshot_size(snapshot) > 0 && to_append(trajectory, snapshot) )
+   {
       trajectory.push_back(snapshot);
       clear_snapshot(snapshot);
    }

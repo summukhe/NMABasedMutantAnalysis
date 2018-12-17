@@ -9,7 +9,6 @@
 # include <stdexcept>
 # include <iomanip>
 # include <iostream>
-# include "coordinate.h"
 using namespace std;
 
 # ifndef M_PI
@@ -23,6 +22,54 @@ using namespace std;
 # define DEG2RAD(x)   ((x) * (M_PI/180.f))
 
 enum AngleFormat { __radian = 1, __degree = 2 };
+
+
+struct Coordinate{
+  float x, y, z;
+  public:
+    Coordinate(const float _x = 0.f,
+               const float _y = 0.f,
+               const float _z = 0.f ):x(_x),
+                                      y(_y),
+                                      z(_z)
+    {}
+    
+    size_t size()const {
+      return 3;
+    }
+
+    float operator [] (const int i)const {
+       switch( i ){
+         case 0: return this->x;
+         case 1: return this->y;
+         case 2: return this->z;
+       } 
+       throw out_of_range("Error: Valid indices are (0,1,2)");
+    }
+    
+    float& operator [] (const int i) {
+       switch( i ){
+         case 0: return this->x;
+         case 1: return this->y;
+         case 2: return this->z;
+       } 
+       throw out_of_range("Error: Valid indices are (0,1,2)");
+    }
+};
+
+float euclidean_distance( Coordinate const& crd1, Coordinate const& crd2 ){
+  return static_cast<float>( sqrt( (crd1.x - crd2.x) * (crd1.x - crd2.x) +
+                                   (crd1.y - crd2.y) * (crd1.y - crd2.y) +
+                                   (crd1.z - crd2.z) * (crd1.z - crd2.z) ) );
+}
+
+
+ostream& operator << (ostream& os, Coordinate const& crd ){
+   os << fixed << setprecision(3) << setw(8) << crd.x << setw(8) << crd.y << setw(8) << crd.z ;
+   return os;
+}
+
+
 
 class Sphere3D{
    private:
@@ -363,11 +410,11 @@ class AABB{
       }
 };
 
-vector<AABB> split_aabb_centrally( AABB const& box ){
+std::vector<AABB> split_aabb_centrally( AABB const& box ){
     Coordinate c = box.center();
     float mxx = box.max_x(), mxy = box.max_y(), mxz = box.max_z();
     float mnx = box.min_x(), mny = box.min_y(), mnz = box.min_z();
-    vector<AABB> quadrants;
+    std::vector<AABB> quadrants;
     quadrants.push_back( AABB( mxx, mxy, mxz, c.x, c.y, c.z ) );
     quadrants.push_back( AABB( c.x, mxy, mxz, mnx, c.y, c.z ) );
     quadrants.push_back( AABB( c.x, c.y, mxz, mnx, mny, c.z ) );
@@ -385,10 +432,19 @@ bool is_intersecting( Plane3D const& plane, Sphere3D const& sphere ){
 }
 
 bool is_intersecting( AABB const& box1, AABB const& box2){
-  vector<Coordinate> vpt = box2.corners();
-  for( typename vector<Coordinate>::const_iterator i = vpt.begin(); i != vpt.end(); ++i )
-    if( box1.is_inside(*i) ) return true;
-  return false;
+  if( box1.volume() > box2.volume() ){
+    std::vector<Coordinate> vpt = box2.corners();
+    for( typename vector<Coordinate>::const_iterator i = vpt.begin(); i != vpt.end(); ++i )
+        if( box1.is_inside(*i) ) 
+			return true;
+	return false;
+  }else{
+	std::vector<Coordinate> vpt = box1.corners();
+    for( typename vector<Coordinate>::const_iterator i = vpt.begin(); i != vpt.end(); ++i )
+        if( box2.is_inside(*i) ) 
+			return true;
+	return false;
+  }
 }
 
 bool is_subset( AABB const& query, AABB const& target )
@@ -449,6 +505,11 @@ AABB bounding_box( Sphere3D const& sphere ){
   Coordinate center = sphere.center();
   float r = sphere.radius();
   return AABB( center.x + r, center.y + r, center.z + r, center.x - r, center.y - r, center.z - r);
+}
+
+Sphere3D inscribed_sphere( AABB const& box ){
+	float d = euclidean_distance(box.max_corner(),box.min_corner());
+	return Sphere3D( box.center(), d/2.);
 }
 
 

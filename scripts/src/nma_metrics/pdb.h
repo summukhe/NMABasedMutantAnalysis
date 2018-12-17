@@ -8,7 +8,7 @@
 # include <vector>
 # include <fstream>
 # include "utility.h"
-# include "coordinate.h"
+# include "geometry.h"
 using namespace std;
 
 # ifndef PDB_LINEWIDTH
@@ -24,15 +24,15 @@ using namespace std;
 # endif
 
 struct Residue{
-    int                residue_id;
-    string             residue_name;
-    vector<string>     atom_names;
-    vector<Coordinate> coordinates;
+    int                     residue_id;
+    string                  residue_name;
+    std::vector<string>     atom_names;
+    std::vector<Coordinate> coordinates;
 };
 
 struct PDBChain{
     char  chain;
-    vector<Residue> residues;
+    std::vector<Residue> residues;
 };
 
 inline bool check_residue(Residue const& residue ){

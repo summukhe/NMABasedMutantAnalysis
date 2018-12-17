@@ -10,7 +10,6 @@
 # include "pdb.h"
 # include "utility.h"
 # include "geometry.h"
-# include "coordinate.h"
 using namespace std;
 
 # ifndef LINE_WIDTH
@@ -25,8 +24,8 @@ using namespace std;
 # define INVALID_INDEX -1
 # endif
 
-typedef map<string,float>              AtomChargeLookup;
-typedef map<string,AtomChargeLookup>   ResidueChargeLookup;
+typedef std::map<string,float>              AtomChargeLookup;
+typedef std::map<string,AtomChargeLookup>   ResidueChargeLookup;
 
 struct ResidueAtomPosition{
     string residue_pre;
@@ -64,13 +63,12 @@ Coordinate place_pseudo_sidechain( Coordinate const& ,
                                    Coordinate const& ,
                                    const float = 1.f );
 
-
 ostream& operator << (ostream& , 
                       ResidueAtomPosition const& );
 
-vector<ResidueAtomPosition> residue_positions_from_pdb( string const& , 
-                                                        const char ,
-                                                        const AngleFormat = __degree);
+std::vector<ResidueAtomPosition> residue_positions_from_pdb( string const& , 
+                                                             const char ,
+                                                             const AngleFormat = __degree);
 
 
 ResidueChargeLookup  read_charge_lookup( string const& filename )
@@ -83,7 +81,7 @@ ResidueChargeLookup  read_charge_lookup( string const& filename )
     ResidueChargeLookup lookup;
     
     while( f.getline(line, LINE_WIDTH)){
-        vector<string> flds = string_split(string(line), sep);
+        std::vector<string> flds = string_split(string(line), sep);
         if( flds.size() == 4 ){
             string resname = flds[0]; 
             string atomname = flds[1];
@@ -96,6 +94,7 @@ ResidueChargeLookup  read_charge_lookup( string const& filename )
     f.close();
     return lookup;
 }
+
 
 Coordinate place_pseudo_sidechain( Coordinate const& ca_1m, 
                                    Coordinate const& ca_0, 
@@ -110,8 +109,8 @@ Coordinate place_pseudo_sidechain( Coordinate const& ca_1m,
 }
     
 
-
-ostream& operator << (ostream& os, ResidueAtomPosition const& pos){
+ostream& operator << (ostream& os, ResidueAtomPosition const& pos)
+{
     os << pos.residue_pre << " "
        << pos.residue_name << " "
        << pos.residue_post << " "
@@ -122,15 +121,17 @@ ostream& operator << (ostream& os, ResidueAtomPosition const& pos){
        << setw(6) << setprecision(2)<< fixed << pos.pseudo_dihed;
     return os;
 }
-    
 
-vector<ResidueAtomPosition> residue_positions_from_pdb( string const& filename, 
-                                                        const char chain,
-                                                        const AngleFormat angtype ){
+
+std::vector<ResidueAtomPosition> residue_positions_from_pdb( string const& filename, 
+		   												     const char chain,
+														     const AngleFormat angtype )
+{
     PDBChain molecule = read_pdb(filename, chain);
-    vector<ResidueAtomPosition> results;
+    std::vector<ResidueAtomPosition> results;
     int n = chain_size(molecule);
-    for(int i=1; i < n-1; ++i ){
+    for(int i=1; i < n-1; ++i )
+	{
         if( (molecule.residues[i].residue_id - molecule.residues[i-1].residue_id == 1 ) &&
             (molecule.residues[i+1].residue_id - molecule.residues[i].residue_id == 1) && 
             (search_atom(molecule.residues[i-1],"CA") != INVALID_INDEX) && 
@@ -144,13 +145,15 @@ vector<ResidueAtomPosition> residue_positions_from_pdb( string const& filename,
             Coordinate pseudo_atom = place_pseudo_sidechain(c1,c2,c3);
             float ang = calculate_angle(c1, c2, c3, angtype);
             int m = residue_size( molecule.residues[i] );
-            for(int j=0; j < m; ++j ){
+            for(int j=0; j < m; ++j )
+			{
                 if( molecule.residues[i].atom_names[j] == "CA")
                     continue;
                 float dist = euclidean_distance(pseudo_atom, molecule.residues[i].coordinates[j]);
+				float pangle = calculate_angle(c2, pseudo_atom, molecule.residues[i].coordinates[j], angtype);
                 float dihed = dihedral_angle(c1, c2, pseudo_atom, 
                                              molecule.residues[i].coordinates[j], angtype);
-                float pangle = calculate_angle(c2, pseudo_atom, molecule.residues[i].coordinates[j], angtype);
+                
                 results.push_back(ResidueAtomPosition(molecule.residues[i-1].residue_name,
                                                       molecule.residues[i].residue_name,
                                                       molecule.residues[i+1].residue_name,
@@ -164,5 +167,62 @@ vector<ResidueAtomPosition> residue_positions_from_pdb( string const& filename,
     }
     return results;
 }
+
+
+class PartialChargeLibrary{
+    protected:
+	   ResidueChargeLookup          m_lookup;
+	   static PartialChargeLibrary* m_inst;
+
+    protected:
+       PartialChargeLibrary()
+	   {
+		   string lib_file = base_directory() + "/data/PartialCharges.csv";
+		   this->m_lookup = read_charge_lookup(lib_file);
+       }
+
+    public:
+	   static PartialChargeLibrary const& get_instance(){
+		  if( PartialChargeLibrary::m_inst == 0 )
+			  PartialChargeLibrary::m_inst = new PartialChargeLibrary();
+		  return *PartialChargeLibrary::m_inst;
+	   }
+
+       int size(void)const 
+	   {
+		   return static_cast<int>(this->m_lookup.size());
+	   }
+	   
+	   std::vector<string> residues()const
+	   {
+		   return keys(this->m_lookup);
+	   }
+	   
+	   int natoms(string const& n)const 
+	   {
+		  if( is_in(this->m_lookup, n) )
+			  this->m_lookup.find(n)->second.size();
+		  return 0;
+	   }
+	   
+	   std::vector<string> atomlist(string const& n)const 
+	   {
+		   std::vector<string> v;
+		   if( is_in(this->m_lookup, n))
+			   v = keys(this->m_lookup.find(n)->second);
+		   return v;
+	   }
+	   
+	   float get_charge(string const& rname, string const& aname )const
+	   {
+		   if( is_in(this->m_lookup, rname ) )
+			   if( is_in(this->m_lookup.find(rname)->second, aname) )
+				   return this->m_lookup.find(rname)->second.find(aname)->second;
+		   return 0.f;
+	   }
+	   
+};
+
+PartialChargeLibrary* PartialChargeLibrary::m_inst = 0;
 
 # endif

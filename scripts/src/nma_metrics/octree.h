@@ -4,7 +4,6 @@
 # include <vector>
 # include <cassert>
 # include "geometry.h"
-# include "coordinate.h"
 using namespace std;
 
 # ifndef ALLOWED_SPLIT
@@ -39,7 +38,7 @@ class ConvexSplitDecision:public SplitDecision
     }
     
     virtual int corner_touched( AABB const& box )const {
-        vector<Coordinate> c = box.corners();
+        std::vector<Coordinate> c = box.corners();
         int enclosed = 0;
         for( int i=0; i < c.size(); ++i )
             if( this->inside_object(c[i]) )
@@ -99,7 +98,7 @@ class Octree{
             
         if( decider(this->box) )
         {
-           vector<AABB> qlist = split_aabb_centrally(this->box);
+           std::vector<AABB> qlist = split_aabb_centrally(this->box);
            assert( qlist.size() == 8 );
            for(int i=0; i < 8; ++i )
            {

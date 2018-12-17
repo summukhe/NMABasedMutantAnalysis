@@ -12,7 +12,7 @@
 # include "amino.h"
 # include "utility.h"
 # include "geometry.h"
-# include "coordinate.h"
+# include "trajectory.h"
 # include "partial_charge.h"
 using namespace std;
 
@@ -29,6 +29,11 @@ struct Configuration{
    Coordinate coordinate;
    float      prob;
    float      charge;
+public:
+   Configuration( Coordinate const& c, const float q, const float p=1.f):coordinate(c),prob(p),charge(q)
+   {
+	   assert( prob >= 0.f && prob <= 1.f);
+   }
 };
 
 string lookup_conversion( const float angle){
@@ -64,28 +69,23 @@ ostream& operator << (ostream& os, ReconstructionUnit const& ru ){
     return os;
 }
 
-typedef vector<ReconstructionUnit>  BuildingBlocks;
-typedef map<string, BuildingBlocks> AminoBlocks;
+typedef std::vector<ReconstructionUnit>  BuildingBlocks;
+typedef std::map<string, BuildingBlocks> AminoBlocks;
 
 
-string base_directory()
-{
-    return "/home/sumanta/Work/codelite_base/nma_metrics/volume_fluctuation";
-}
-
-map<string, AminoBlocks> read_reconstruction_dictionary(){
+std::map<string, AminoBlocks> read_reconstruction_dictionary(){
     string dict = base_directory() + "/data/AtomModels.csv";
     assert( is_file(dict) );
     ifstream f(dict.c_str());
     char line[LINE_WIDTH];
     bzero(line, LINE_WIDTH);
     int counter = 0;
-    map<string, AminoBlocks> library;
+    std::map<string, AminoBlocks> library;
     AminoBlocks blocks;
     string lastName, lastAtom;
     while( f.getline(line, LINE_WIDTH) ){
         if(counter > 0){
-            vector<string> flds = string_split(string(line), ",");
+            std::vector<string> flds = string_split(string(line), ",");
             if( flds.size() == 7 ){
                 string name = flds[0];
                 string atom = flds[1];
@@ -100,7 +100,6 @@ map<string, AminoBlocks> read_reconstruction_dictionary(){
                 if( ! is_in(library[name], atom) )
                     library[name][atom] = BuildingBlocks();
                 library[name][atom].push_back(ReconstructionUnit(cls, dist, angle, dihed, prob) );
-                
             }
         }
         counter++;
@@ -108,14 +107,15 @@ map<string, AminoBlocks> read_reconstruction_dictionary(){
     return library;
 }
 
+
 class ReconstructionLibrary{
 protected:
-    map<string, AminoBlocks> library;
+    std::map<string, AminoBlocks> m_lib;
     static ReconstructionLibrary* m_inst;
 private:
     ReconstructionLibrary()
     {
-        this->library = read_reconstruction_dictionary();
+        this->m_lib = read_reconstruction_dictionary();
     }
     
 public:
@@ -126,11 +126,51 @@ public:
         return *ReconstructionLibrary::m_inst;
     }
     
-    map<string, AminoBlocks> get_library()const
+    int size()const
     {
-        return this->library;
+        return static_cast<int>(this->m_lib.size());
     }
+	
+	std::vector<string> residues()const
+	{
+		return keys(this->m_lib);
+	}
+	
+	int natoms(string const& n)const
+	{
+		if( is_in(this->m_lib, n))
+			return static_cast<int>( this->m_lib.find(n)->second.size() );
+		return 0;
+	}
+	
+	std::vector<string> atom_list(string const& n)const
+	{
+		std::vector<string> v;
+		if(is_in(this->m_lib, n))
+			v = keys( this->m_lib.find(n)->second );
+		return v;
+	}
+	
+	int nconfigurations(string const& rname, string const& aname )const
+	{
+		if( is_in(this->m_lib, rname) )
+			if( is_in( this->m_lib.find(rname)->second, aname) )
+				return static_cast<int>(this->m_lib.find(rname)->second.find(aname)->second.size());
+		return 0;
+	}
+	
+	std::vector<ReconstructionUnit> configurations(string const& rname, string const& aname)const
+	{
+		std::vector<ReconstructionUnit> v;
+		if( is_in(this->m_lib, rname) )
+			if( is_in( this->m_lib.find(rname)->second, aname) )
+				v = this->m_lib.find(rname)->second.find(aname)->second;
+		return v;
+	}
 };
+
+ReconstructionLibrary* ReconstructionLibrary::m_inst = 0;
+
 
 Coordinate reconstruct_coordinate( Coordinate const& ak, 
                                    Coordinate const& aj, 
@@ -152,36 +192,71 @@ Coordinate reconstruct_coordinate( Coordinate const& ak,
 }
 
 
-class CaReconstructionUnit{
-
-    typedef vector<Configuration>   Configurations;
+class CaReconstructionUnit
+{
+    typedef std::vector<Configuration>   Configurations;
 
     protected:
        AminoAcid                    amino;
-       map<string, Configurations>  configs;
+       std::map<string, Configurations>  configs;
     
-    private:
-       CaReconstructionUnit();
-     
     public:
-        CaReconstructionUnit( Coordinate const& ca0, 
-                              Coordinate const& ca1, 
-                              Coordinate const& ca2,
-                              string const& aa):amino( get_amino(aa) ),
-							                    configs()
+        CaReconstructionUnit():amino(::get_amino("ALA")),configs()
+		{}
+		
+		CaReconstructionUnit( CaReconstructionUnit const& ru):amino(ru.amino),
+															  configs(ru.configs)
+        {}
+		
+		CaReconstructionUnit(Coordinate const& ca0, 
+                             Coordinate const& ca1, 
+                             Coordinate const& ca2,
+                             string const& aa):amino(::get_amino(aa)),configs()
+		{
+			this->build(ca0, ca1, ca2, aa);
+		}
+
+		bool build(Coordinate const& ca0, 
+                   Coordinate const& ca1, 
+                   Coordinate const& ca2,
+                   string const& aa)
         {
+			this->amino = ::get_amino(aa);
+			this->configs.clear();
             ReconstructionLibrary const& rl = ReconstructionLibrary::get_instance();
-            float angle = calculate_angle(ca0, ca1, ca2, __radian);
+            float angle = calculate_angle(ca0, ca1, ca2, __degree);
             Coordinate c = place_pseudo_sidechain(ca0, ca1, ca2);
+			std::vector<string> atoms = rl.atom_list(aa);
             string lp = lookup_conversion(angle);
+			PartialChargeLibrary const& ql = PartialChargeLibrary::get_instance();
             int n = ::natoms(this->amino);
-            for(int i=0; i < n; ++i){
+            for(int i=0; i < n; ++i)
+			{
                 string aname = this->amino.atoms[i];
+				Configurations pos;
+				if( aname == "CA" )
+				{
+					pos.push_back(Configuration(ca1,ql.get_charge(aa,aname)));
+				}else
+				{
+					std::vector<ReconstructionUnit> ru = rl.configurations(aa, aname); 
+					for( int j = 0; j < ru.size(); ++j )
+					{
+						if( ru[j].lookup == lp )
+						{
+						  Coordinate crd = reconstruct_coordinate(ca0, ca1, c, 
+						                                          ru[j].distance, 
+																  DEG2RAD(ru[j].angle), 
+																  DEG2RAD(ru[j].dihedral) );
+						  pos.push_back(Configuration(crd, 
+						                              ql.get_charge(aa,aname), 
+													  ru[j].prob));
+						}
+					 
+					}
+				}
+				configs[aname] = pos;
             }
-        }
-        
-        CaReconstructionUnit( CaReconstructionUnit const& ru):amino(ru.amino), configs(ru.configs)
-        {
         }
      
         string  name()const 
@@ -194,27 +269,27 @@ class CaReconstructionUnit{
             return ::natoms(this->amino);
         }
         
-        vector<string>  atom_names()const
+        std::vector<string>  atom_names()const
         {
             return this->amino.atoms;
         }
         
-        vector<float> atom_charges()const
+        std::vector<float> atom_charges()const
         {
             return this->amino.partial_charges;
         }
         
-        vector<string>  charged_atoms()const
+        std::vector<string>  charged_atoms()const
         {
             return ::charged_atoms(this->amino);
         }
         
-        bool  is_atom( string const& a )const
+        bool is_atom( string const& a )const
         {
             return is_in(this->configs, a);
         }
         
-        int   nconfigurations( string const& a )const
+        int nconfigurations( string const& a )const
         {
             if( is_in(this->configs, a) ){
 				return this->configs.find(a)->second.size();
@@ -230,5 +305,114 @@ class CaReconstructionUnit{
         }
 };
 
+
+class CASequence{
+    protected:
+	   std::vector<int>                    m_resids;
+	   std::map<int,AminoAcid>             m_residues;
+	   std::map<int,Coordinate>            m_ca_pos;
+	   std::map<int,CaReconstructionUnit>  m_reconstruct;
+    public:
+	   CASequence():m_resids(),m_residues(),m_ca_pos(),m_reconstruct()
+	   {}
+	   
+	   int size()const
+	   {
+		   return static_cast<int>(m_resids.size());
+	   }
+	   
+	   bool add_residue(const int resid, string const& resname, Coordinate const& crd)
+	   {
+		   int n = this->size() - 1;
+		   if( is_in(this->m_residues, resid) ) 
+		       return false;
+			   
+		   if( n > 0 && resid - this->m_resids.back() != 1 )
+			   return false;
+			   
+		   if( ! ::is_amino(resname) )
+			   return false;
+		   
+		   if( n > 1 ){
+			   float d = ::euclidean_distance(this->m_ca_pos[this->m_resids[n]], 
+			                                this->m_ca_pos[this->m_resids[n-1]]);
+											
+			/*								
+			   if( d < CACA_MIN_DISTANCE ||  d > CACA_MAX_DISTANCE )
+				   cerr << "Error: CA("<< this->m_resids[n-1]<< ") - CA("<< this->m_resids[n] <<") distance : " << d << endl;
+			 */  
+		   }
+			   
+		   this->m_resids.push_back(resid);
+		   this->m_residues[resid] = ::get_amino(resname);
+		   this->m_ca_pos[resid] = crd;
+		   if( this->size() > 2 )
+		   {
+			   n = this->size() - 1;
+			   this->m_reconstruct[this->m_resids[n-2]] = CaReconstructionUnit();
+			   
+			   this->m_reconstruct[this->m_resids[n-2]].build(this->m_ca_pos[this->m_resids[n-3]],
+			                                                  this->m_ca_pos[this->m_resids[n-2]],
+														      this->m_ca_pos[this->m_resids[n-1]],   
+															  ::name(this->m_residues[this->m_resids[n-2]]));
+		   }
+	   }
+	   
+	   std::vector<int> residue_ids( bool reconstruct_only = false )const 
+	   {
+		   std::vector<int> vResidues;
+		   
+		   if( reconstruct_only )
+			   vResidues = ::keys( this->m_reconstruct );
+		   else
+			   vResidues = this->m_resids;
+		   return vResidues;
+	   }
+		
+	   AminoAcid const& get_amino( const int resid )const
+	   {
+		   assert( ::is_in(this->m_residues, resid) );
+		   return this->m_residues.find(resid)->second;
+	   }
+		
+	   Coordinate get_ca_coordinate( const int resid )const
+	   {
+		   assert( ::is_in(this->m_ca_pos, resid) );
+		   return this->m_ca_pos.find(resid)->second;
+	   }
+	   
+	   std::vector<int> amino_positions( const string& aa )const
+	   {
+		   std::vector<int> hits;
+		   for( auto it = this->m_residues.begin(); it != this->m_residues.end(); ++it )
+			 if( aa == ::name(it->second) )
+			    hits.push_back(it->first);
+		   return hits; 
+	   }
+	   
+	   int count_aminos( const string& aa )const
+	   {
+		   return static_cast<int>( this->amino_positions(aa).size() );
+	   }
+	   
+
+	   CaReconstructionUnit const& residue_config(const int resid)const
+	   {
+		   assert( ::is_in( this->m_reconstruct , resid) );
+		   return this->m_reconstruct.find(resid)->second;
+	   }
+};
+
+
+CASequence convert_snapshot2caseq( Snapshot const& s )
+{
+	int n = snapshot_size(s);
+	CASequence seq;
+	for( int i=0; i < n; ++i )
+	  seq.add_residue(s.residueIds[i], 
+	                  s.residueType[i], 
+					  s.coordinates[i]);
+	return seq;
+}
 
 # endif

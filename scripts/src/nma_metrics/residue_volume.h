@@ -7,7 +7,6 @@
 # include <cassert>
 # include <cstdlib>
 # include "geometry.h"
-# include "coordinate.h"
 using namespace std;
 
 # ifndef EPS
@@ -32,9 +31,13 @@ typedef Sphere3D SideChainModel;
 
 
 float get_radius( string const& );
-int naminos();
-int amino_index( string const& );
-SideChainModel fix_sidechain( Coordinate const&, Coordinate const&, Coordinate const&, string const&);
+int   naminos();
+int   amino_index( string const& );
+
+SideChainModel fix_sidechain( Coordinate const&, 
+							  Coordinate const&, 
+							  Coordinate const&, 
+							      string const&);
 
 
 float get_radius( string const& resname ){

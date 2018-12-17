@@ -1,22 +1,32 @@
 # ifndef __TRAJECTORY_H
 # define __TRAJECTORY_H
 
+# include <map>
 # include <cmath>
 # include <vector>
 # include <string>
 # include <algorithm>
-# include "coordinate.h"
+# include "geometry.h"
 using namespace std;
 
+# ifndef LARGE_DISTANCE
+# define LARGE_DISTANCE  99999999999.f
+# endif
+
+
+# ifndef INVALID_RESID
+# define INVALID_RESID   999999
+# endif
+
+
 struct PDBxyz{
-  vector<int>         residueIds;
-  vector<string>      residueType;
-  vector<Coordinate>  coordinates;
+  std::vector<int>         residueIds;
+  std::vector<string>      residueType;
+  std::vector<Coordinate>  coordinates;
 };
 
 typedef struct PDBxyz Snapshot;
-typedef vector<Snapshot> Trajectory;
-typedef vector<int>  ResidueIds;
+typedef std::vector<Snapshot> Trajectory;
 
 void       clear_snapshot( Snapshot&);
 
@@ -87,7 +97,7 @@ bool valid_snapshot( Snapshot& snapshot ){
 
 
 int residue_position( Snapshot const& snapshot, const int residueId ){
-   typename vector<int>::const_iterator it;
+   typename std::vector<int>::const_iterator it;
    if( (it = find( snapshot.residueIds.begin(), snapshot.residueIds.end(), residueId)) == snapshot.residueIds.end() )
       return -1;
    return static_cast<int>( it - snapshot.residueIds.begin() );
@@ -204,6 +214,7 @@ int trajectory_align( Trajectory const& trj1,
    return shift;
 }
 
+
 Trajectory flip_trajectory( Trajectory const& trj )
 {
     int n = trajectory_size(trj);
@@ -211,6 +222,53 @@ Trajectory flip_trajectory( Trajectory const& trj )
     for(int i=0; i < n; ++i )
         rev.push_back( trj[(n-i-1)%n ] );
     return rev;
+}
+
+
+struct NeighborData{
+	int    nbr_residx;
+	float  nbr_distance;
+public:
+	NeighborData(int n, float d):nbr_residx(n),nbr_distance(d)
+	{}
+};
+
+std::map<int, std::vector<NeighborData> > top_n_neighbors( Snapshot const& snapshot, const int topn )
+{
+	int n = snapshot_size(snapshot);
+	std::vector<int> resids = snapshot.residueIds;
+	assert( ::snapshot_size(snapshot) > topn && topn > 0);
+	std::map<int, std::vector<NeighborData> > res;
+	for( int i = 0 ; i < n; ++i )
+	{
+		vector<float> di(topn,LARGE_DISTANCE);
+		vector<int>   ni(topn,INVALID_RESID);
+		for( int j = 0; j < n; ++j )
+		{
+			if( i == j ) continue;
+			float d = ::euclidean_distance( snapshot.coordinates[i], 
+			                                snapshot.coordinates[j] );
+			if( d < di[topn-1] )
+			{
+				int pivot = topn - 1;
+				di[pivot] = d;
+				ni[pivot] = j;
+				for(int k = topn-2; k >= 0; --k)
+				{
+					if( di[pivot] < di[k] )
+					{
+						std::swap(di[pivot], di[k]);
+						std::swap(ni[pivot], ni[k]);
+						pivot = k;
+					}
+				}
+			}
+		}
+		res[snapshot.residueIds[i]] = std::vector<NeighborData>();
+		for( int j=0; j < topn; ++j )
+			res[snapshot.residueIds[i]].push_back(NeighborData(ni[j],di[j]));
+	}
+	return res;
 }
 
 # endif

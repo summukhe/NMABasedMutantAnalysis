@@ -3,9 +3,12 @@
 # include <cassert>
 # include <unistd.h>
 # include <cstdlib>
+
+# include "grid.h"
 # include "utility.h"
 # include "trajectory.h"
 # include "config_reader.h"
+# include "electrostatics.h"
 # include "trajectory_analysis.h"
 using namespace std;
 
@@ -75,22 +78,20 @@ int  main( int argc, char** argv)
    
    BoundingBoxConfig config = ::read_boundingbox_configfile(box_configfile.c_str());
    Grid3D grid(config.box_max, config.box_min, grid_size);
-   
-   TrajectorySignature ref_trj_sig = generate_volume_signature(trajectory_ref , 
+
+   TrajectorySignature ref_trj_sig = generate_volume_signature(trajectory_ref,
                                                                config.box_max, 
-                                                               config.box_min, 
-                                                               grid_size, 
-                                                               VOL_DISCRETE);
-															   
+															   config.box_min, 
+															   grid_size,
+															   VOL_DISCRETE);   
    
-   TrajectorySignature tgt_trj_sig = generate_volume_signature(trajectory_tgt , 
+   TrajectorySignature tgt_trj_sig = generate_volume_signature(trajectory_tgt,
                                                                config.box_max, 
-                                                               config.box_min, 
-                                                               grid_size, 
-                                                               VOL_DISCRETE );
+															   config.box_min, 
+															   grid_size,
+															   VOL_DISCRETE);   
    
-   std::vector<float> vsig = trajectory_signature_difference(ref_trj_sig, tgt_trj_sig);
-   cout << fixed << setprecision(5) << (mean(vsig.begin(), vsig.end()) / grid.grid_volume()) * 1000.f <<endl;
+   cout << fixed << setprecision(5) << (occlusion_score( ref_trj_sig, tgt_trj_sig ) / grid.grid_volume())*1000.f <<endl;
 
    return 0;
 }

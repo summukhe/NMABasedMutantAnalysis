@@ -9,18 +9,27 @@
 # include <string>
 # include <cstdio>
 # include <cstdlib>
+# include <sstream>
 # include <functional>
 # include <algorithm>
 # include <sys/stat.h>
 # include <sys/types.h>
 using namespace std;
 
+string base_directory();
 bool is_file( char const* );
 bool is_file( string const& );
 bool is_integer( string const& );
+bool is_float( string const& );
 bool is_dir( char const* );
 bool is_dir( string const& );
 vector<string> string_split(string const& , string const& );
+
+
+string base_directory()
+{
+   return "/home/sumanta/Work/codelite_base/nma_metrics/volume_fluctuation";
+}
 
 
 bool is_file( char const* filename ){
@@ -32,9 +41,11 @@ bool is_file( char const* filename ){
   return false;
 }
 
+
 bool is_file( string const& filename ){
    return is_file(filename.c_str());
 }
+
 
 bool is_dir( char const* dir ){
     struct stat info;
@@ -44,6 +55,7 @@ bool is_dir( char const* dir ){
         return true;
     return false;
 }
+
 
 bool is_dir( string const& dir ){
     return is_dir(dir.c_str());
@@ -65,11 +77,22 @@ vector<string> string_split(string const& sentence, string const& delimiter )
     return words;
 }
 
-bool is_integer( string const& str ){
-  for(int i=0; i < str.size(); ++i )
-   if( str[i] < '0' && str[i] > '9')
-       return false;
-  return str.size() > 0;
+
+bool is_integer( string const& str )
+{
+  istringstream iss(str);
+  int f;
+  iss >> noskipws >> f;
+  return iss.eof() && ! iss.fail();
+}
+
+
+bool is_float( string const& str )
+{
+	istringstream iss(str);
+	float f;
+	iss >> noskipws >> f;
+	return iss.eof() && ! iss.fail();
 }
 
 
@@ -83,6 +106,7 @@ float mean( Iterator start, Iterator end ){
   }
   return (n > 0)?(s/n):s;
 }
+
 
 template<typename Iterator>
 float sd( Iterator start, Iterator end ){
@@ -101,6 +125,20 @@ float sd( Iterator start, Iterator end ){
 template<typename Key, typename Value>
 bool is_in( map<Key,Value> const& m, Key const& key){
     return (m.find(key) != m.end());
+}
+
+template<typename Value>
+bool is_in( vector<Value> const& v, Value const& d){
+	return (find(v.begin(), v.end(), d) != v.end());
+}
+
+template<typename Key, typename Value>
+vector<Key> keys( map<Key,Value> const& m )
+{
+	vector<Key> names;
+	for(typename map<Key,Value>::const_iterator i = m.begin(); i != m.end(); ++i )
+		names.push_back(i->first);
+	return names;
 }
 
 static inline std::string &ltrim(std::string &s) {

@@ -19,6 +19,14 @@ using namespace std;
 # define EPS 1e-5
 # endif
 
+# ifndef CACA_MAX_DISTANCE
+# define CACA_MAX_DISTANCE 4.0f
+# endif
+
+# ifndef CACA_MIN_DISTANCE
+# define CACA_MIN_DISTANCE 3.6f
+# endif
+
 struct AminoAcid{
     string name;
     vector<string> atoms;
@@ -27,19 +35,30 @@ struct AminoAcid{
 };
 
 
-static const string Amino3Letter[NAMINOS] = {"ALA", "CYS", "ASP", "GLU", 
-                                             "PHE", "GLY", "HIS", "ILE", 
-                                             "LYS", "LEU", "MET", "ASN", 
-                                             "PRO", "GLN", "ARG", "SER", 
-                                             "THR", "VAL", "TRP", "TYR" 
-                                             };
+static const string Amino3Letter[   ] = {"ALA", "CYS", "ASP", "GLU", 
+                                         "PHE", "GLY", "HIS", "ILE", 
+                                         "LYS", "LEU", "MET", "ASN", 
+                                         "PRO", "GLN", "ARG", "SER", 
+                                         "THR", "VAL", "TRP", "TYR" };
                                        
-static const char Amino1Letter[20] =  {'A', 'C', 'D', 'E', 
-                                       'F', 'G', 'H', 'I',
-                                       'K', 'L', 'M', 'N', 
-                                       'P', 'Q', 'R', 'S', 
-                                       'T', 'V', 'W', 'Y'};
-                                       
+static const char Amino1Letter[ ] =  {'A', 'C', 'D', 'E', 
+                                      'F', 'G', 'H', 'I',
+                                      'K', 'L', 'M', 'N', 
+                                      'P', 'Q', 'R', 'S', 
+                                      'T', 'V', 'W', 'Y'};
+
+static const float HydroPathyIndex[ ] = { 1.8,  2.5, -3.5, -3.5, 
+                                          2.8, -0.4, -3.2,  4.5, 
+									     -3.9,  3.8,  1.9, -3.5, 
+										 -1.6, -3.5, -4.5, -0.8, 
+										 -0.7,  4.2, -0.9, -1.3};  
+										  
+static const float ResidueVolume[ ] = { 88.6, 108.5, 111.1, 138.4, 
+                                       189.9,  60.1, 153.2, 166.7, 
+									   168.6, 166.7, 162.9, 114.1, 
+									   112.7, 143.8, 173.4,  89.0, 
+									   116.1, 140.0, 227.8, 193.6};
+                                     
 static const string ALA_AMINO[] = {"N", "H", "CA", "C", "O", "CB"};
 static const string CYS_AMINO[] = {"N", "H", "CA", "C", "O", "CB", "SG"};
 static const string ASP_AMINO[] = {"N", "H", "CA", "C", "O", "CB", "CG", "OD1", "OD2"};
@@ -51,7 +70,7 @@ static const string ILE_AMINO[] = {"N", "H", "CA", "C", "O", "CB", "CG1", "CG2"}
 static const string LYS_AMINO[] = {"N", "H", "CA", "C", "O", "CB", "CG", "CD", "CE", "NZ", "HZ1", "HZ2"};
 static const string LEU_AMINO[] = {"N", "H", "CA", "C", "O", "CB", "CG", "CD1", "CD2"};
 static const string MET_AMINO[] = {"N", "H", "CA", "C", "O", "CB", "CG", "SD", "CE"};
-static const string ASN_AMINO[] = {"N", "H", "CA", "C", "O", "CB", "CG", "OD1", "ND2", "HD21", "HD22" };
+static const string ASN_AMINO[] = {"N", "H", "CA", "C", "O", "CB", "CG", "OD1", "ND2", "HD21", "HD22"};
 static const string PRO_AMINO[] = {"N", "CA", "C", "O", "CB", "CG", "CD"};
 static const string GLN_AMINO[] = {"N", "H", "CA", "C", "O", "CB", "CG", "CD", "OE1", "NE2", "HE21", "HE22"};
 static const string ARG_AMINO[] = {"N", "H", "CA", "C", "O", "CB", "CG", "CD", "CG", "CZ", "NE", "HE", "NH1", "HH11", "HH12", "NH2", "HH21", "HH22"};
@@ -73,7 +92,7 @@ static const float ILE_PARTIAL[] = {-0.280,  0.280,  0.000,  0.380, -0.380,  0.0
 static const float LYS_PARTIAL[] = {-0.280,  0.280,  0.000,  0.380, -0.380,  0.000,  0.000,  0.000,  0.000, -0.830,  0.415,  0.415};
 static const float LEU_PARTIAL[] = {-0.280,  0.280,  0.000,  0.380, -0.380,  0.000,  0.000,  0.000,  0.000};
 static const float MET_PARTIAL[] = {-0.280,  0.280,  0.000,  0.380, -0.380,  0.000,  0.000,  0.000,  0.000};
-static const float ASN_PARTIAL[] = {-0.280,  0.280,  0.000,  0.380, -0.380,  0.000,  0.380, -0.380, -0.830, -0.830,  0.415,  0.415};
+static const float ASN_PARTIAL[] = {-0.280,  0.280,  0.000,  0.380, -0.380,  0.000,  0.380, -0.380, -0.830,  0.415,  0.415};
 static const float PRO_PARTIAL[] = { 0.000,  0.000,  0.380, -0.380,  0.000,  0.000,  0.000};
 static const float GLN_PARTIAL[] = {-0.280,  0.280,  0.000,  0.380, -0.380,  0.000,  0.000,  0.380, -0.380, -0.830,  0.415,  0.415};
 static const float ARG_PARTIAL[] = {-0.280,  0.280,  0.000,  0.380, -0.380,  0.000,  0.000,  0.090,  0.000,  0.340, -0.110,  0.240, -0.260,  0.240,  0.240, -0.260,  0.240,  0.240};
@@ -325,12 +344,14 @@ AminoAcid get_amino(const char c){
 }
 
 
-AminoAcid get_amino(string const& a){
+AminoAcid get_amino(string const& a)
+{
     return get_amino(amino_abbr(a));
 }
 
 
-vector<string> charged_atoms( AminoAcid const& a ){
+vector<string> charged_atoms( AminoAcid const& a )
+{
     int n = natoms(a);
     vector<string> catoms;
     for(int i=0; i < n; ++i )
@@ -338,5 +359,36 @@ vector<string> charged_atoms( AminoAcid const& a ){
             catoms.push_back(a.atoms[i]);
     return catoms;
 }
+
+float get_volume( string const& res )
+{
+	int n = sizeof(Amino3Letter)/sizeof(string);
+	for( int i=0; i < n; ++i )
+		if( res == Amino3Letter[i] )
+			return ResidueVolume[i];
+	return 0.f;
+}
+
+
+float get_volume( AminoAcid const& aa )
+{
+	return ::get_volume(::name(aa));
+}
+
+
+float get_hydropathy( string const& res )
+{
+	int n = sizeof(Amino3Letter)/sizeof(string);
+	for( int i=0; i < n; ++i )
+		if( res == Amino3Letter[i] )
+			return HydroPathyIndex[i];
+	return 0.f;
+}
+
+float get_hydropathy( AminoAcid const& aa )
+{
+	return ::get_hydropathy(::name(aa));
+}
+
 
 # endif
